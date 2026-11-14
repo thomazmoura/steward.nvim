@@ -1,0 +1,40 @@
+local paths = require("steward.paths")
+
+T.test("code_folder takes $CODE_FOLDER, as its real path", function()
+  T.mkdirs("real")
+  vim.uv.fs_symlink(T.dir .. "/real", T.dir .. "/code")
+  T.eq(paths.code_folder(), T.dir .. "/real")
+end)
+
+T.test("code_folder takes the configured one first, a function too", function()
+  T.mkdirs("code", "other")
+  T.eq(paths.code_folder(T.dir .. "/other"), T.dir .. "/other")
+  T.eq(paths.code_folder(function()
+    return T.dir .. "/other"
+  end), T.dir .. "/other")
+end)
+
+T.test("resolve: relative to the code folder, ~ and absolute", function()
+  local root = "/srv/code"
+  T.eq(paths.resolve("clients", root), "/srv/code/clients")
+  T.eq(paths.resolve("  clients/a/  ", root), "/srv/code/clients/a")
+  T.eq(paths.resolve("/etc/nginx", root), "/etc/nginx")
+  T.eq(paths.resolve("~/notes", root), vim.fs.normalize(vim.fn.expand("~") .. "/notes"))
+end)
+
+T.test("shown: relative in the code folder, ~ under home, else absolute", function()
+  local home = vim.uv.fs_realpath(vim.fn.expand("~"))
+  T.eq(paths.shown("/srv/code/a/b", "/srv/code"), "a/b")
+  T.eq(paths.shown(home .. "/notes", "/srv/code"), "~/notes")
+  T.eq(paths.shown("/etc", "/srv/code"), "/etc")
+  T.eq(paths.shown("/srv/codex", "/srv/code"), "/srv/codex")
+end)
+
+T.test("children: first level, hidden folders and files left out, sorted ignoring case", function()
+  T.mkdirs("p/b", "p/A", "p/.hidden", "p/A/deep")
+  T.write(T.dir .. "/p/file", "")
+  vim.uv.fs_symlink(T.dir .. "/p/b", T.dir .. "/p/link")
+  vim.uv.fs_symlink(T.dir .. "/nowhere", T.dir .. "/p/broken")
+  T.eq(paths.children(T.dir .. "/p"), { "A", "b", "link" })
+  T.eq(paths.children(T.dir .. "/missing"), {})
+end)
