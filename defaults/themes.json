@@ -10,8 +10,8 @@
     { "name": "coral", "color": "#ff7f50" },
     { "name": "sky", "color": "#87ceeb" },
     { "name": "everforest", "color": "#a7c080" },
-    { "name": "ssh", "color": "#9370db" },
-    { "name": "docker", "color": "#2496ed" }
+    { "name": "azure", "color": "#2496ed" },
+    { "name": "lavender", "color": "#7486ee" }
   ],
   "assignments": [
     { "match": "default", "theme": "moon" }

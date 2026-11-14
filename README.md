@@ -109,7 +109,7 @@ The file is `$XDG_CONFIG_HOME/dev-environment/themes.json`:
 }
 ```
 
-- **Defaults:** while there is no file, the screen shows steward's [`defaults/themes.json`](defaults/themes.json): the old tmux-power themes plus `ssh` and `docker`, with `default` set to `moon`. Saving writes them. Without a file, tmux behaves as before (`@theme`).
+- **Defaults:** while there is no file, the screen shows steward's [`defaults/themes.json`](defaults/themes.json): the old tmux-power themes plus `azure` and `lavender`, with `default` set to `moon`. Saving writes them. Without a file, tmux behaves as before (`@theme`).
 - **When it applies:** at once. Saving runs dev-environment's `Set-SessionTheme.sh -g -a`, which draws the global bar and every open session in their new colours (set `themes.apply` to another script, or `false`). `prefix,u` does the same, and a session switch, attach, new session or new `prefix,$` name re-themes that session (`Set-SessionTheme.sh` and `themes.py`).
 
 The screen:
