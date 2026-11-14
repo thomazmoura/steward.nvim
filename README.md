@@ -81,6 +81,7 @@ dev-environment's tmux draws the status bar, borders and messages in one accent 
 | Key | Takes effect for |
 |---|---|
 | `default` | any session no other key matches |
+| `default (ssh)`, `default (docker)` | an ssh session (`prefix,N`) or a Docker session (`prefix,D`) no `@Host` key matches |
 | `Directory` | a local session in that folder, or in a folder under it (the longest match wins) |
 | `SessionName` | a local session of that name, or the session with that `prefix,$` name (label): `ApolloEnv` for `dev-environment` named ApolloEnv |
 | `Directory@Host` | an ssh/Docker session (`prefix,N`, `prefix,D`) in that folder on that host, or under it |
@@ -89,8 +90,8 @@ dev-environment's tmux draws the status bar, borders and messages in one accent 
 - **Telling them apart:** a key is a Directory when it is path-like: it starts with `/` or `~`, or contains a `/`. Anything else is a SessionName, so write `~/code/x` or `./x` for a top-level folder.
 - **Directories:** a local Directory is relative to the code folder, `~/…`, or absolute, as in `projects.json`. A Directory@Host is absolute.
 - **Hosts:** the key is split at its first `@`. The host is the session's ssh target, whole (`user@host`, `docker:name`) or just its host part.
-- **Which key wins:** SessionName beats Directory, which beats `default`.
-- **ssh and Docker sessions:** they only take `@Host` keys. With none matching, they keep the ssh violet or Docker blue, so they never look like a local session.
+- **Which key wins:** the most specific one that matches. A local session takes SessionName, then Directory, then `default`. An ssh/Docker session takes SessionName@Host, then Directory@Host, then `default (ssh)` or `default (docker)`, then `default`.
+- **ssh and Docker sessions:** they never take a local SessionName or Directory key. A Docker session is one whose target is `docker:name`. Without a `default (ssh)` or `default (docker)`, they take `default`. Without a file, they keep the ssh violet or Docker blue.
 - **Linked machines:** a session on a linked machine is drawn by that machine's tmux, from that machine's file.
 
 The file is `$XDG_CONFIG_HOME/dev-environment/themes.json`:
@@ -109,7 +110,7 @@ The file is `$XDG_CONFIG_HOME/dev-environment/themes.json`:
 }
 ```
 
-- **Defaults:** while there is no file, the screen shows steward's [`defaults/themes.json`](defaults/themes.json): the old tmux-power themes plus `azure` and `lavender`, with `default` set to `moon`. Saving writes them. Without a file, tmux behaves as before (`@theme`).
+- **Defaults:** while there is no file, the screen shows steward's [`defaults/themes.json`](defaults/themes.json): the old tmux-power themes plus `azure` and `lavender`, with `default` set to `moon`, `default (ssh)` to `violet` and `default (docker)` to `azure` (the colours ssh and Docker sessions had before). Saving writes them. Without a file, tmux behaves as before (`@theme`).
 - **When it applies:** at once. Saving runs dev-environment's `Set-SessionTheme.sh -g -a`, which draws the global bar and every open session in their new colours (set `themes.apply` to another script, or `false`). `prefix,u` does the same, and a session switch, attach, new session or new `prefix,$` name re-themes that session (`Set-SessionTheme.sh` and `themes.py`).
 
 The screen:
@@ -122,8 +123,9 @@ Themes   a name and its #rrggbb accent colour
 ├─ moon: #00abab   ██  used by 1
 └─ coral: #ff7f50   ██  unused
 
-Assignments   default, Directory, SessionName, Directory@Host, SessionName@Host
+Assignments   default, default (ssh|docker), Directory, SessionName, Directory@Host, SessionName@Host
 ├─ default: moon   ██  fallback
+├─ default (ssh): coral   ██  fallback for ssh sessions
 ├─ ApolloEnv: coral   ██  named session
 ├─ acme: coral   ██  path-based session  ~/code/acme
 ├─ ~/later: coral   ██  path-based session (missing)
@@ -133,6 +135,7 @@ Assignments   default, Directory, SessionName, Directory@Host, SessionName@Host
 - **Editing:** a line is `key: value` (`name: #rrggbb` under Themes, `key: theme` under Assignments), indented under its section with tree guides drawn over the indentation, as on the projects screen. The key is coloured. It ends at the last `:` followed by a blank, so a key may contain spaces and colons (`Proj@docker:apollo: coral`).
 - **Hints:** each colour gets a swatch, and each theme says how many assignments use it. Each key says what kind it is, and a relative folder shows where it points:
   - `fallback`: `default`;
+  - `fallback for ssh sessions`, `fallback for Docker sessions`: `default (ssh)`, `default (docker)`;
   - `named session`: a name a session has, or a `prefix,$` name (`~/.cache/tmux/session-names`, open or not); muted as `(no such name)` while nothing has that name;
   - `path-based session`: a folder; muted as `(missing)` while it doesn't exist. It can still be saved, and takes effect once the folder is there;
   - `named session on <host>`, `path-based session on <host>`: the same for ssh/Docker sessions.
@@ -140,11 +143,12 @@ Assignments   default, Directory, SessionName, Directory@Host, SessionName@Host
   - a bad name or colour, or a duplicate;
   - an unknown theme;
   - no `default`, or `default@host`;
+  - a `default (…)` for anything but `ssh` or `docker`;
   - a relative Directory@Host;
   - a duplicate key;
   - an edited header line.
 - **Keys:** the same save, reload and `{` / `}`, `g1` / `g2` keys as the projects screen. Typing on an Assignments line suggests, as you type, a key or (after `key: `) a theme's name, with the theme's colour beside it; `<Tab>` / `<S-Tab>` move in the menu and `<CR>` takes the selected one, or the first. Keys come from:
-  - `default`;
+  - `default`, `default (ssh)` and `default (docker)`;
   - the `prefix,$` names, local ones as they are and the others as `name@target`;
   - the tmux server's sessions: local ones by name, ssh/Docker ones as `name@target` and `folder@target`;
   - the folders `prefix,/` offers (the code folder's, plus what `projects.json` adds).

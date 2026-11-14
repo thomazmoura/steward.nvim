@@ -14,6 +14,8 @@
     { "name": "lavender", "color": "#7486ee" }
   ],
   "assignments": [
-    { "match": "default", "theme": "moon" }
+    { "match": "default", "theme": "moon" },
+    { "match": "default (ssh)", "theme": "violet" },
+    { "match": "default (docker)", "theme": "azure" }
   ]
 }

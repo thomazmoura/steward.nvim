@@ -29,13 +29,17 @@ T.test("with no file it shows the defaults, unmodified, and saving writes them",
   local lines = content(bufnr)
   T.eq(lines[1], "Themes")
   T.ok(vim.tbl_contains(lines, "   moon: #00abab"), vim.inspect(lines))
-  T.eq(lines[#lines], "   default: moon")
+  T.eq(lines[#lines], "   default (docker): azure")
   T.eq(vim.bo[bufnr].modified, false)
   T.eq(T.read(file()), nil)
   require("steward.themes").save(bufnr)
   local saved = vim.json.decode(T.read(file()))
   T.eq(#saved.themes, 11)
-  T.eq(saved.assignments, { { match = "default", theme = "moon" } })
+  T.eq(saved.assignments, {
+    { match = "default", theme = "moon" },
+    { match = "default (ssh)", theme = "violet" },
+    { match = "default (docker)", theme = "azure" },
+  })
 end)
 
 T.test("an edit is saved, unknown keys kept", function()
@@ -107,6 +111,8 @@ T.test("keys complete to sessions and the pickers' folders", function()
     return candidate.word
   end, require("steward.themes").key_candidates(bufnr))
   T.eq(words, {
+    "default (ssh)",
+    "default (docker)",
     "ApolloEnv",
     "box@me@prod",
     "/srv/app@me@prod",
@@ -175,7 +181,7 @@ T.test("a prefix+$ label is a named session, offered and recognised", function()
   local words = vim.tbl_map(function(candidate)
     return candidate.word
   end, require("steward.themes").key_candidates(bufnr))
-  T.eq(words, { "Abelha@me@work" }, "ApolloEnv and default are assigned already")
+  T.eq(words, { "default (ssh)", "default (docker)", "Abelha@me@work" }, "ApolloEnv and default are assigned already")
   local hints = {}
   for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(bufnr, vim.api.nvim_create_namespace("steward_themes"), 0, -1, { details = true })) do
     for _, chunk in ipairs(mark[4].virt_text or {}) do

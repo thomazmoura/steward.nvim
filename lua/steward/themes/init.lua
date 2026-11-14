@@ -8,7 +8,7 @@
 --   ├─ moon: #00abab  ██  used by 1
 --   └─ gold: #ffb86c  ██  unused
 --
---   Assignments   default, Directory, SessionName, Directory@Host, SessionName@Host
+--   Assignments   default, default (ssh|docker), Directory, SessionName, Directory@Host, SessionName@Host
 --   ├─ default: moon  ██  fallback
 --   ├─ ApolloEnv: gold  ██  named session              (a prefix+$ label, or a session's name)
 --   ├─ clients/acme: gold  ██  path-based session
@@ -342,7 +342,8 @@ local function section_at_cursor(bufnr)
   end
 end
 
---- What a key can be, for completion: { word, menu } in this order: default, the tmux
+--- What a key can be, for completion: { word, menu } in this order: default, the connection
+--- defaults (default (ssh), default (docker)), the tmux
 --- sessions (local ones by name, ssh/Docker ones as name@target and folder@target), then the
 --- folders the session pickers offer (the code folder's and what projects.json adds), as the
 --- projects screen shows them. Keys already assigned are left out. A folder shown with no / is
@@ -367,6 +368,9 @@ function M.key_candidates(bufnr)
     end
   end
   add("default", "fallback")
+  for _, connection in ipairs(parse.CONNECTIONS) do
+    add("default (" .. connection.name .. ")", "fallback for " .. connection.label .. " sessions")
+  end
   for _, label in ipairs(require("steward.tmux").labels()) do
     if not label.label:find("[/@]") then
       if label.target == "" then

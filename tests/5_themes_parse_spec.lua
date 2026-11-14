@@ -22,6 +22,8 @@ T.test("key kinds", function()
     return { parse.key_kind(key) }
   end
   T.eq(kind("default"), { "default", "default" })
+  T.eq(kind("default (ssh)"), { "connection", "ssh" })
+  T.eq(kind("default(Docker )"), { "connection", "docker" })
   T.eq(kind("ApolloEnv"), { "session", "ApolloEnv" })
   T.eq(kind("steward.nvim"), { "session", "steward.nvim" })
   T.eq(kind("~/notes"), { "directory", "~/notes" })
@@ -61,6 +63,32 @@ T.test("a directory key loses its trailing slash", function()
   local entries = check({ "Themes", "  a: #000000", "Assignments", "  default: a", "  ~/work/: a", "  /srv/@h: a" })
   T.eq(entries.assignments[2].key, "~/work")
   T.eq(entries.assignments[3].key, "/srv@h")
+end)
+
+T.test("a connection default: written as default (<connection>), ssh or docker only", function()
+  local entries, errors = check({
+    "Themes", "  t: #000000",
+    "Assignments",
+    "  default: t",
+    "  default(SSH): t",
+    "  default (docker): t",
+  })
+  T.eq(errors, {})
+  T.eq(entries.assignments[2].key, "default (ssh)")
+  T.eq({ parse.describe(entries.assignments[2]) }, { "fallback for ssh sessions", false })
+  T.eq({ parse.describe(entries.assignments[3]) }, { "fallback for Docker sessions", false })
+  _, errors = check({
+    "Themes", "  t: #000000",
+    "Assignments",
+    "  default: t",
+    "  default (ssh): t",
+    "  default ( ssh ): t",
+    "  default (mosh): t",
+    "  default (ssh)@prod: t",
+  })
+  has(errors, "default (ssh) is already on line 5")
+  has(errors, "default (mosh): the connection is ssh or docker")
+  has(errors, "Line 8: a default takes no @host")
 end)
 
 T.test("what blocks saving", function()
@@ -140,6 +168,9 @@ T.test("the bundled defaults are valid", function()
   local entries, errors = check(parse.render(data))
   T.eq(errors, {})
   T.eq(#entries.themes, 11)
+  T.eq(vim.tbl_map(function(item)
+    return item.key
+  end, entries.assignments), { "default", "default (ssh)", "default (docker)" })
 end)
 
 T.test("each key says what it is, muted while it has no effect", function()

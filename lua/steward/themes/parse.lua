@@ -12,6 +12,8 @@
 --
 -- Which session a key is about (key_kind; dev-environment's themes.py reads keys the same way):
 --   default            whatever nothing more specific matches (required)
+--   default (ssh)      an ssh session (prefix+N) no @Host key matches; default (docker) the same
+--                      for a Docker one (prefix+D). Without it, such a session takes default
 --   Directory          a local session in that folder or one under it; path-like: it starts with /
 --                      or ~, or has a /. Relative to the code folder, as projects.json's paths
 --   SessionName        a local session of that name or prefix+$ label (dev-environment's
@@ -20,13 +22,15 @@
 --                      is absolute; the key is split at its first @
 --   SessionName@Host   an ssh/Docker session of that name on Host
 -- Host is the session's ssh target as prefix+N took it (user@host or docker:name), or its host.
+-- Which wins, most specific first: SessionName, Directory, default. On an ssh/Docker session:
+-- SessionName@Host, Directory@Host, default (ssh) or default (docker), default.
 local M = {}
 
 local paths = require("steward.paths")
 
 M.SECTIONS = {
   { key = "themes", title = "Themes", hint = "a name and its #rrggbb accent colour" },
-  { key = "assignments", title = "Assignments", hint = "default, Directory, SessionName, Directory@Host, SessionName@Host" },
+  { key = "assignments", title = "Assignments", hint = "default, default (ssh|docker), Directory, SessionName, Directory@Host, SessionName@Host" },
 }
 
 -- Between a key and its value
@@ -34,10 +38,17 @@ M.SEPARATOR = ": "
 
 M.KINDS = {
   default = "fallback",
+  connection = "fallback for a connection",
   directory = "path-based session",
   session = "named session",
   ["directory@host"] = "path-based session on a host",
   ["session@host"] = "named session on a host",
+}
+
+-- The connections a "default (<name>)" key is for, in completion's order, with how a hint names them
+M.CONNECTIONS = {
+  { name = "ssh", label = "ssh" },
+  { name = "docker", label = "Docker" },
 }
 
 local INDENT = require("steward.ui.guides").prefix(1)
@@ -67,8 +78,18 @@ local function path_like(text)
   return first == "/" or first == "~" or text:find("/", 1, true) ~= nil
 end
 
+--- The connection a "default (<connection>)" key names (lowercase, maybe not one of
+--- M.CONNECTIONS), or nil when the key is not one. Blanks around the name are allowed.
+---@param key string
+---@return string|nil
+local function connection_of(key)
+  local name = key:match("^default%s*%(%s*(.-)%s*%)$")
+  return name and name:lower()
+end
+
 --- What session a key is about: its kind (a key of M.KINDS), the part before the @ (the
---- directory or session name) and the host (nil without an @)
+--- directory or session name, or for a connection default the connection) and the host (nil
+--- without an @)
 ---@param key string
 ---@return string kind
 ---@return string subject
@@ -76,6 +97,10 @@ end
 function M.key_kind(key)
   if key == "default" then
     return "default", key, nil
+  end
+  local connection = connection_of(key)
+  if connection then
+    return "connection", connection, nil
   end
   local subject, host = key:match("^([^@]*)@(.*)$")
   subject = subject or key
@@ -124,8 +149,13 @@ function M.split(line)
   return indent, vim.trim(key), value, indent + #key + 1
 end
 
---- A typed key as it is saved: a directory's trailing slashes dropped (but for /)
+--- A typed key as it is saved: a directory's trailing slashes dropped (but for /), a connection
+--- default written as "default (<connection>)"
 local function clean_key(key)
+  local connection = connection_of(key)
+  if connection then
+    return "default (" .. connection .. ")"
+  end
   local subject, host = key:match("^([^@]*)@(.*)$")
   local function strip(path)
     if #path > 1 and path_like(path) then
@@ -227,12 +257,19 @@ function M.validate(entries, root, names)
     local identity = item.key
     if item.kind == "default" then
       defaults = defaults + 1
+    elseif item.kind == "connection" then
+      local known = vim.tbl_contains(vim.tbl_map(function(connection)
+        return connection.name
+      end, M.CONNECTIONS), item.subject)
+      if not known then
+        fail(item, ("%s: the connection is ssh or docker"):format(item.key))
+      end
     elseif item.subject == "" then
       fail(item, ("%s: nothing before the @"):format(item.key))
     elseif item.host == "" then
       fail(item, ("%s: no host after the @"):format(item.key))
-    elseif item.subject == "default" and item.host then
-      fail(item, "default takes no @host: it is the fallback everywhere")
+    elseif item.host and (item.subject == "default" or connection_of(item.subject)) then
+      fail(item, "a default takes no @host: it is the fallback everywhere")
     elseif item.kind == "directory@host" and item.subject:sub(1, 1) ~= "/" then
       fail(item, ("%s: a folder on a host is absolute (its ~ and code folder are not known here)"):format(item.key))
     elseif item.kind == "directory" then
@@ -274,6 +311,13 @@ end
 ---@return string text
 ---@return boolean idle
 function M.describe(item)
+  if item.kind == "connection" then
+    for _, connection in ipairs(M.CONNECTIONS) do
+      if connection.name == item.subject then
+        return "fallback for " .. connection.label .. " sessions", false
+      end
+    end
+  end
   local text = M.KINDS[item.kind] or item.kind
   if item.host then
     text = text:gsub("a host$", function()
