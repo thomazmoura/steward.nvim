@@ -3,7 +3,7 @@ local parse = require("steward.projects.parse")
 T.test("render and parse round-trip", function()
   local data = { parents = { "clients", "~/work" }, folders = { "/etc" } }
   local lines = parse.render(data)
-  T.eq(lines, { "Parent directories", "  clients", "  ~/work", "", "Individual directories", "  /etc" })
+  T.eq(lines, { "Parent directories", "   clients", "   ~/work", "", "Individual directories", "   /etc" })
   local entries, errors = parse.parse(lines)
   T.eq(errors, {})
   T.eq(parse.values(entries), data)

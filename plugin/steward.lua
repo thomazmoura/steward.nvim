@@ -8,6 +8,9 @@ local subcommands = {
   projects = function()
     require("steward").projects()
   end,
+  themes = function()
+    require("steward").themes()
+  end,
 }
 
 vim.api.nvim_create_user_command("Steward", function(opts)
@@ -23,7 +26,7 @@ vim.api.nvim_create_user_command("Steward", function(opts)
   run(opts)
 end, {
   nargs = "?",
-  desc = "Steward: edit the environment's settings (projects: the tmux pickers' project folders)",
+  desc = "Steward: edit the environment's settings (projects: the tmux pickers' project folders; themes: the tmux theme colours)",
   complete = function(lead)
     return vim.tbl_filter(function(name)
       return name:find(lead, 1, true) == 1
@@ -42,7 +45,10 @@ local function setup_highlights()
     StewardKey = { link = "Identifier" },
     StewardValue = { link = "String" },
     StewardHint = { link = "Comment" },
+    StewardGuide = { link = "LspCodeLens" },
     StewardCount = { link = "Number" },
+    StewardKind = { link = "Type" },
+    StewardMuted = { link = "NonText" },
     StewardNew = { link = "DiagnosticOk" },
     StewardWarn = { link = "DiagnosticWarn" },
     StewardError = { link = "DiagnosticError" },

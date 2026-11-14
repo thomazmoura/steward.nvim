@@ -2,11 +2,11 @@
 -- entries read back from the edited lines (parse), with what blocks a save (validate).
 --
 --   Parent directories            a section title, as rendered (case aside)
---     clients                     one path a line, indented
---     ~/work
+--      clients                    one path a line, indented one level (the screen draws tree
+--      ~/work                     guides over the indentation: ├─ clients, └─ ~/work)
 --
 --   Individual directories
---     ~/notes
+--      ~/notes
 local M = {}
 
 local paths = require("steward.paths")
@@ -16,7 +16,7 @@ M.SECTIONS = {
   { key = "folders", title = "Individual directories", hint = "listed themselves" },
 }
 
-local INDENT = "  "
+local INDENT = require("steward.ui.guides").prefix(1)
 
 --- The section a line is the title of, or nil
 ---@param line string

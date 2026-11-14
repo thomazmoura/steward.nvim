@@ -123,4 +123,40 @@ function M.children(parent)
   return names
 end
 
+--- The pickers' folders: the first level of `root`, of every parent, and every individual
+--- folder (project_folders.projects). Folders reached twice, `root` itself and paths that do
+--- not exist are left out.
+---@param root string The code folder
+---@param data table { parents, folders }, as store.load gives them
+---@return string[] absolute paths, as reached (not resolved through links), sorted ignoring case
+function M.projects(root, data)
+  local candidates = {}
+  local function children_of(parent)
+    for _, name in ipairs(M.children(parent)) do
+      table.insert(candidates, parent .. "/" .. name)
+    end
+  end
+  children_of(root)
+  for _, parent in ipairs(data.parents or {}) do
+    children_of(M.resolve(parent, root))
+  end
+  for _, folder in ipairs(data.folders or {}) do
+    table.insert(candidates, M.resolve(folder, root))
+  end
+  local real_root = uv.fs_realpath(root) or root
+  local seen, result = {}, {}
+  for _, candidate in ipairs(candidates) do
+    local path = vim.fs.normalize(candidate)
+    local real = uv.fs_realpath(path)
+    if real and real ~= real_root and not seen[real] and is_dir(real) then
+      seen[real] = true
+      table.insert(result, path)
+    end
+  end
+  table.sort(result, function(a, b)
+    return M.shown(a, root):lower() < M.shown(b, root):lower()
+  end)
+  return result
+end
+
 return M

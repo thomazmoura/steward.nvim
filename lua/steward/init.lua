@@ -1,5 +1,6 @@
--- steward.nvim: the environment's settings, edited as text in Neovim. For now the project
--- folders the tmux session pickers offer (projects.json, :Steward projects).
+-- steward.nvim: the environment's settings, edited as text in Neovim: the project folders the
+-- tmux session pickers offer (projects.json, :Steward projects) and the tmux theme colours
+-- (themes.json, :Steward themes).
 local M = {}
 
 local config = require("steward.config")
@@ -12,6 +13,11 @@ end
 --- The project folders screen
 function M.projects()
   return require("steward.projects").open()
+end
+
+--- The themes screen
+function M.themes()
+  return require("steward.themes").open()
 end
 
 return M

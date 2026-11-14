@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "themes": [
+    { "name": "gold", "color": "#ffb86c" },
+    { "name": "redwine", "color": "#b34a47" },
+    { "name": "moon", "color": "#00abab" },
+    { "name": "forest", "color": "#228b22" },
+    { "name": "violet", "color": "#9370db" },
+    { "name": "snow", "color": "#fffafa" },
+    { "name": "coral", "color": "#ff7f50" },
+    { "name": "sky", "color": "#87ceeb" },
+    { "name": "everforest", "color": "#a7c080" },
+    { "name": "ssh", "color": "#9370db" },
+    { "name": "docker", "color": "#2496ed" }
+  ],
+  "assignments": [
+    { "match": "default", "theme": "moon" }
+  ]
+}

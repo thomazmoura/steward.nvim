@@ -6,11 +6,11 @@
 --   Saved in     ~/.config/dev-environment/projects.json
 --   ─────────────────────────── ◇ ───────────────────────────
 --   Parent directories
---     clients                                              12 folders
---     ~/work                                               missing
+--   ├─ clients  12 folders  ~/code/clients
+--   └─ ~/work  missing
 --
 --   Individual directories
---     ~/notes                                              new
+--   └─ ~/notes  new
 --
 -- The tmux session pickers (dev-environment's prefix+/, and prefix+N on a linked machine) list
 -- the first level of the code folder, the first level of every parent directory and every
@@ -19,7 +19,9 @@
 -- from $CODE_FOLDER and is only shown here.
 local M = {}
 
+local choices = require("steward.ui.choices")
 local config = require("steward.config")
+local guides = require("steward.ui.guides")
 local header = require("steward.ui.header")
 local parse = require("steward.projects.parse")
 local paths = require("steward.paths")
@@ -67,6 +69,7 @@ local function decorate(bufnr)
   end
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
   local lines, first = content_lines(bufnr)
+  guides.draw(bufnr, first, parse.section_of)
   for index, line in ipairs(lines) do
     if parse.section_of(line) then
       local section = parse.section_of(line)
@@ -284,27 +287,30 @@ local function preview(bufnr)
   vim.api.nvim_create_autocmd("WinLeave", { buffer = float, once = true, callback = vim.schedule_wrap(close) })
 end
 
---- Insert-mode completion of folders (omnifunc), relative paths under the code folder
-function M.complete(findstart, base)
-  local bufnr = vim.api.nvim_get_current_buf()
+--- Where the completed folder starts (0-based): after the indent
+local function completion_start(line)
+  return #(line:match("^%s*") or "")
+end
+
+--- The folders the cursor's line can be (relative paths under the code folder, or any folder
+--- once it starts with / or ~), nil on a section title
+local function line_choices(bufnr, lnum)
   local state = buffers[bufnr]
-  if findstart == 1 then
-    local line = vim.api.nvim_get_current_line()
-    return #(line:match("^%s*") or "")
+  local line = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1] or ""
+  if not state or not state.root or lnum <= header.size(bufnr) or parse.section_of(line) then
+    return nil
   end
-  if not state then
-    return {}
-  end
+  local base = line:sub(completion_start(line) + 1, vim.api.nvim_win_get_cursor(0)[2])
   local absolute = base:sub(1, 1) == "/" or base:sub(1, 1) == "~"
   local query = absolute and base or (state.root .. "/" .. base)
-  local matches = {}
+  local result = {}
   for _, match in ipairs(vim.fn.getcompletion(query, "dir")) do
     local word = absolute and match or match:sub(#state.root + 2)
     if word ~= "" then
-      table.insert(matches, { word = word, menu = "folder" })
+      table.insert(result, { word = word, menu = "folder" })
     end
   end
-  return matches
+  return result
 end
 
 local function setup_keymaps(bufnr)
@@ -317,6 +323,7 @@ local function setup_keymaps(bufnr)
   map("n", "<leader>R", function()
     M.reload(bufnr)
   end, "Reload projects.json")
+  choices.map(bufnr)
   map("n", "<CR>", function()
     local action = header.action(bufnr, vim.api.nvim_win_get_cursor(0)[1])
     if action then
@@ -395,9 +402,10 @@ function M.open()
   vim.bo[bufnr].bufhidden = "hide"
   vim.bo[bufnr].swapfile = false
   vim.bo[bufnr].filetype = "steward-projects"
-  vim.bo[bufnr].expandtab = true
-  vim.bo[bufnr].shiftwidth = 2
-  vim.bo[bufnr].omnifunc = "v:lua.require'steward.projects'.complete"
+  guides.setup_buffer(bufnr, function(b)
+    return header.size(b) + 1
+  end, parse.section_of)
+  choices.attach(bufnr, { choices = line_choices, start = completion_start })
   buffers[bufnr] = { loaded = {} }
   setup_keymaps(bufnr)
   setup_autocmds(bufnr)

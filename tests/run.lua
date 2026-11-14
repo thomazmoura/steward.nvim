@@ -54,6 +54,11 @@ function T.test(name, fn)
   vim.fn.mkdir(T.dir, "p")
   vim.env.XDG_CONFIG_HOME = T.dir .. "/config"
   vim.env.CODE_FOLDER = T.dir .. "/code"
+  -- The session labels from this folder, and no tmux server: tmux looks for one in an empty
+  -- folder, so a test never reads or re-themes the sessions of the tmux it runs under
+  vim.env.XDG_CACHE_HOME = T.dir .. "/cache"
+  vim.env.TMUX = nil
+  vim.env.TMUX_TMPDIR = T.dir
   -- Messages are not printed (a test that checks them replaces this)
   vim.notify = function() end
   local ok, err = xpcall(fn, debug.traceback)
