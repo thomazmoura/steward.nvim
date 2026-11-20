@@ -1,10 +1,13 @@
--- The project folders screen (:Steward projects): projects.json as an editable buffer, in the
--- style of workhorse.nvim's repository screens.
+-- The project folders screen (:Steward projects): the code folder and projects.json as an
+-- editable buffer, in the style of workhorse.nvim's repository screens.
 --
 --   Project folders                                                 Reload
---   Code folder  ~/code  read-only · 24 folders
---   Saved in     ~/.config/dev-environment/projects.json
+--   Saved in     ~/.config/dev-environment/code-folder
+--                ~/.config/dev-environment/projects.json
 --   ─────────────────────────── ◇ ───────────────────────────
+--   Code folder
+--   └─ /Git  24 folders
+--
 --   Parent directories
 --   ├─ clients  12 folders  ~/code/clients
 --   └─ ~/work  missing
@@ -15,8 +18,13 @@
 -- The tmux session pickers (dev-environment's prefix+/, and prefix+N on a linked machine) list
 -- the first level of the code folder, the first level of every parent directory and every
 -- individual directory. A path is relative to the code folder, ~/..., or absolute. Adding,
--- changing and removing one is editing the text; <leader><leader> saves. The code folder comes
--- from $CODE_FOLDER and is only shown here.
+-- changing and removing one is editing the text; <leader><leader> saves.
+--
+-- The code folder is saved apart, as one line in the code-folder file, which every shell on the
+-- machine exports as $CODE_FOLDER (dev-environment's code-folder-env.sh, from ~/.bashrc); saving
+-- also hands it to the tmux server, for its new panes. It must be a folder that exists: nothing is
+-- saved until it is. Before it was ever saved, the screen shows the one worked out
+-- (paths.code_folder), and saving keeps it.
 local M = {}
 
 local choices = require("steward.ui.choices")
@@ -31,7 +39,8 @@ local store = require("steward.store")
 local NAME = "Steward|projects"
 local ns = vim.api.nvim_create_namespace("steward_projects")
 
--- Buffer -> { root, file, loaded = { [path] = true }, extra, broken }
+-- Buffer -> { root, file, code_folder_file, code_folder (saved, or nil), code_folder_hint (why it
+-- is shown when it is not the saved one), loaded = { [path] = true }, extra, broken }
 local buffers = {}
 
 local function notify(message, level)
@@ -51,13 +60,15 @@ local function content_lines(bufnr)
   return vim.api.nvim_buf_get_lines(bufnr, size, -1, false), size + 1
 end
 
---- The entries of the buffer as edited, resolved: entries, errors
+--- The entries of the buffer as edited, resolved: entries, errors and the code folder as edited
+--- (the loaded one while the edited one is not a folder)
 local function read(bufnr)
   local state = buffers[bufnr]
   local lines, first = content_lines(bufnr)
   local entries, errors = parse.parse(lines, first)
-  vim.list_extend(errors, parse.validate(entries, state.root))
-  return entries, errors
+  local invalid, root = parse.validate(entries, state.root)
+  vim.list_extend(errors, invalid)
+  return entries, errors, root
 end
 
 --- Section titles in bold, and a hint after each path: how many folders a parent adds, where a
@@ -88,19 +99,24 @@ local function decorate(bufnr)
         table.insert(chunks, { "  " .. text, hl })
       end
       if item.duplicate then
-        add("duplicate", "StewardError")
+        add(section.single and "one code folder only" or "duplicate", "StewardError")
       elseif item.state == "file" then
         add("not a folder", "StewardError")
+      elseif item.state == "relative" then
+        add("write it ~/... or absolute", "StewardError")
       elseif item.state == "missing" then
-        add("missing", "StewardWarn")
-      elseif section.key == "parents" then
+        add("missing", section.single and "StewardError" or "StewardWarn")
+      elseif section.key == "parents" or section.single then
         add(plural(#paths.children(item.path), "folder"), "StewardCount")
       end
+      if section.single and state.code_folder_hint and item.entry == state.code_folder_shown then
+        add(state.code_folder_hint, "StewardHint")
+      end
       -- Where a path relative to the code folder is
-      if not item.entry:match("^[/~]") then
+      if not section.single and not item.entry:match("^[/~]") then
         add(home_short(item.path), "StewardHint")
       end
-      if not state.loaded[section.key .. "\0" .. item.path] then
+      if item.path and not state.loaded[section.key .. "\0" .. item.path] then
         add("new", "StewardNew")
       end
       vim.api.nvim_buf_set_extmark(bufnr, ns, item.lnum - 1, 0, { virt_text = chunks })
@@ -110,9 +126,8 @@ end
 
 local function info(state)
   local chunks = {
-    { { "Code folder  ", "StewardKey" }, { home_short(state.root), "StewardValue" },
-      { "  read-only · " .. plural(#paths.children(state.root), "folder"), "StewardHint" } },
-    { { "Saved in     ", "StewardKey" }, { home_short(state.file), "StewardHint" } },
+    { { "Saved in     ", "StewardKey" }, { home_short(state.code_folder_file), "StewardHint" } },
+    { { "             ", "StewardKey" }, { home_short(state.file), "StewardHint" } },
   }
   if state.broken then
     table.insert(chunks, { { "Not read     ", "StewardKey" }, { state.broken, "StewardError" } })
@@ -123,16 +138,34 @@ end
 --- Fill the buffer from the file (what is saved, dropping any edit)
 local function load(bufnr)
   local state = buffers[bufnr]
-  state.root = paths.code_folder(config.options.projects.code_folder)
+  local configured = config.options.projects.code_folder
+  state.root = paths.code_folder(configured)
   state.file = config.projects_file()
+  state.code_folder_file = config.code_folder_file()
+  state.code_folder = store.load_code_folder(state.code_folder_file)
   local data, err = store.load(state.file)
   state.broken = err
   data = data or { parents = {}, folders = {}, extra = {} }
   state.extra = data.extra
-  state.loaded = {}
+  -- The code folder as saved; else the one in use, with why it is that one
+  if configured then
+    state.code_folder_shown = home_short(state.root)
+    state.code_folder_hint = "set in setup(): not saved here"
+  elseif state.code_folder then
+    state.code_folder_shown = state.code_folder
+    state.code_folder_hint = nil
+  else
+    state.code_folder_shown = home_short(state.root)
+    state.code_folder_hint = (vim.env.CODE_FOLDER or "") ~= "" and "from $CODE_FOLDER, not saved yet"
+      or "guessed, not saved yet"
+  end
+  data.code_folder = state.code_folder_shown
+  state.loaded = { ["code_folder\0" .. state.root] = true }
   for _, section in ipairs(parse.SECTIONS) do
-    for _, entry in ipairs(data[section.key]) do
-      state.loaded[section.key .. "\0" .. paths.resolve(entry, state.root)] = true
+    if not section.single then
+      for _, entry in ipairs(data[section.key]) do
+        state.loaded[section.key .. "\0" .. paths.resolve(entry, state.root)] = true
+      end
     end
   end
   local HEADER = header.new("Project folders", info(state), {
@@ -151,14 +184,15 @@ local function load(bufnr)
   end
 end
 
---- Save the edited entries to projects.json
+--- Save the edited entries: the code folder to its file (and to the tmux server), the rest to
+--- projects.json. Nothing is written while anything blocks saving, the code folder included.
 function M.save(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local state = buffers[bufnr]
   if not state then
     return
   end
-  local entries, errors = read(bufnr)
+  local entries, errors, root = read(bufnr)
   local edited = header.check(bufnr)
   if edited then
     table.insert(errors, 1, edited)
@@ -174,8 +208,17 @@ function M.save(bufnr)
     end
   end
   local values = parse.values(entries)
-  values.extra = state.extra
-  local ok, err = store.save(state.file, values)
+  local saved = { home_short(state.file) }
+  if not config.options.projects.code_folder and values.code_folder ~= state.code_folder then
+    local ok, err = store.save_code_folder(state.code_folder_file, values.code_folder)
+    if not ok then
+      notify("could not save " .. state.code_folder_file .. ": " .. tostring(err), vim.log.levels.ERROR)
+      return
+    end
+    require("steward.tmux").set_code_folder(root)
+    table.insert(saved, 1, home_short(state.code_folder_file))
+  end
+  local ok, err = store.save(state.file, { parents = values.parents, folders = values.folders, extra = state.extra })
   if not ok then
     notify("could not save " .. state.file .. ": " .. tostring(err), vim.log.levels.ERROR)
     return
@@ -184,7 +227,7 @@ function M.save(bufnr)
   local view = vim.fn.winsaveview()
   load(bufnr)
   vim.fn.winrestview(view)
-  notify("saved " .. home_short(state.file))
+  notify("saved " .. table.concat(saved, " and "))
 end
 
 --- Load the file again, asking first when there are edits
@@ -319,10 +362,10 @@ local function setup_keymaps(bufnr)
   end
   send.map(bufnr, function()
     M.save(bufnr)
-  end, "Save projects.json")
+  end, "Save the code folder and projects.json")
   map("n", "<leader>R", function()
     M.reload(bufnr)
-  end, "Reload projects.json")
+  end, "Reload the code folder and projects.json")
   choices.map(bufnr)
   map("n", "<CR>", function()
     local action = header.action(bufnr, vim.api.nvim_win_get_cursor(0)[1])

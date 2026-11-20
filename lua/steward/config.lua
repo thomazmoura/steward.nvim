@@ -11,8 +11,10 @@ local defaults = {
     -- The project folders file; nil is $XDG_CONFIG_HOME/dev-environment/projects.json, where
     -- dev-environment's tmux pickers read it (resolved when used, so $XDG_CONFIG_HOME may change)
     file = nil,
-    -- The code folder: a path, a function returning one, or nil for $CODE_FOLDER, else the tmux
-    -- server's $CODE_FOLDER, else the first of ~/code, ~/git and /Git (paths.code_folder)
+    -- The code folder: a path, a function returning one, or nil for the one the projects screen
+    -- saves ($XDG_CONFIG_HOME/dev-environment/code-folder), else $CODE_FOLDER, else the tmux
+    -- server's $CODE_FOLDER, else the first of ~/code, ~/git and /Git (paths.code_folder). When
+    -- set, the screen shows it and does not save its Code folder section.
     code_folder = nil,
   },
   themes = {
@@ -37,6 +39,12 @@ function M.setup(opts)
       M.options[name].file = nil
     end
   end
+end
+
+--- The code-folder file's path: next to the projects file's default place, whatever
+--- projects.file says, since every shell reads it there
+function M.code_folder_file()
+  return config_home() .. "/dev-environment/code-folder"
 end
 
 --- The projects file's path

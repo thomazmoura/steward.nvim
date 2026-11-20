@@ -1,5 +1,12 @@
--- The settings files steward edits, all plain JSON so a script with no Neovim can read them.
--- Keys steward does not know are kept as they are when it saves.
+-- The settings files steward edits, plain JSON or plain text so a script with no Neovim can read
+-- them. Keys steward does not know are kept as they are when it saves.
+--
+-- code-folder, where the projects are: one line, the folder (~/... or absolute), read by every
+-- shell (dev-environment's code-folder-env.sh, from ~/.bashrc, exports it as $CODE_FOLDER) and by
+-- the scripts that work the code folder out (code-folder.sh, kernel-profile.ps1, tmux_link.py).
+-- Plain text rather than JSON so a shell reads it with a builtin, on every ssh command:
+--
+--   /Git
 --
 -- projects.json, the project folders the tmux session pickers offer (dev-environment's
 -- project_folders.py reads it):
@@ -158,6 +165,31 @@ end
 ---@return string|nil err
 function M.save(path, data)
   return M.write_atomic(path, M.encode(data))
+end
+
+-- Code folder ---------------------------------------------------------------------------------
+
+--- The code folder saved at `path`, its first line trimmed; nil when there is none
+---@param path string
+---@return string|nil
+function M.load_code_folder(path)
+  local handle = io.open(path, "rb")
+  if not handle then
+    return nil
+  end
+  local line = handle:read("*l")
+  handle:close()
+  line = line and vim.trim(line) or ""
+  return line ~= "" and line or nil
+end
+
+--- Write the code folder `folder` (as typed: ~/... or absolute) to `path`
+---@param path string
+---@param folder string
+---@return boolean ok
+---@return string|nil err
+function M.save_code_folder(path, folder)
+  return M.write_atomic(path, folder .. "\n")
 end
 
 -- Themes --------------------------------------------------------------------------------------

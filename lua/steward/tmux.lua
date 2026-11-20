@@ -59,6 +59,19 @@ function M.labels()
   return labels
 end
 
+--- Hand `folder` (absolute) to the tmux server as its global $CODE_FOLDER, which every new pane
+--- and popup inherits (dev-environment's common.conf sets it at load from code-folder.sh): the
+--- pickers and new panes then use a code folder saved by the projects screen without a reload.
+--- In the background; false when there is no tmux.
+---@param folder string
+---@return boolean
+function M.set_code_folder(folder)
+  if vim.fn.executable("tmux") == 0 then
+    return false
+  end
+  return (pcall(vim.system, { "tmux", "set-environment", "-g", "CODE_FOLDER", folder }, { text = true }))
+end
+
 --- The script that themes the open sessions again (dev-environment's Set-SessionTheme.sh), or
 --- nil when it is not there
 ---@param setting string|false|nil config.options.themes.apply

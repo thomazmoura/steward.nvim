@@ -32,8 +32,10 @@ local function tmux_code_folder()
   return (result.stdout or ""):match("^CODE_FOLDER=(.-)%s*$")
 end
 
---- Where the projects are: `configured` (config.code_folder) when given, else $CODE_FOLDER, else
---- the tmux server's, else the first of ~/code, ~/git and /Git that exists, else ~. Always the
+--- Where the projects are: `configured` (config.code_folder) when given, else the code-folder file
+--- the projects screen saves, else $CODE_FOLDER, else the tmux server's, else the first of ~/code,
+--- ~/git and /Git that exists, else ~. The file before the variable, as in dev-environment's
+--- code-folder.sh, so a Neovim started before a change does not keep the old folder. Always the
 --- real path, as tmux and git see it (a ~/code linked to /Git is /Git).
 ---@param configured string|function|nil
 ---@return string
@@ -42,7 +44,9 @@ function M.code_folder(configured)
     configured = configured()
   end
   local candidates = {}
-  local first = configured or vim.env.CODE_FOLDER
+  local first = configured
+    or require("steward.store").load_code_folder(require("steward.config").code_folder_file())
+    or vim.env.CODE_FOLDER
   if first == nil or first == "" then
     first = tmux_code_folder()
   end

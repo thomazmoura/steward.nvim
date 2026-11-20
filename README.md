@@ -9,8 +9,7 @@ There are two screens: the **project folders** the tmux session pickers offer, a
 
 ## Project folders (`:Steward projects`)
 
-dev-environment's `prefix,/` lists the first level of folders in the code folder
-(`$CODE_FOLDER`). `projects.json` adds more:
+dev-environment's `prefix,/` lists the first level of folders in the code folder. `projects.json` adds more:
 
 - **Parent directories:** their first level of folders is listed (hidden ones left out).
 - **Individual directories:** these folders are listed themselves.
@@ -33,7 +32,7 @@ The file is `$XDG_CONFIG_HOME/dev-environment/projects.json`, by default `~/.con
 
 A path is relative to the code folder, `~/…`, or absolute. Relative paths let one file fit machines whose code folders differ.
 
-- **Code folder:** it is always a parent, and it is not written to the file.
+- **Code folder:** the screen's first section, edited like the others. It is always a parent. It is saved on its own, as one line in `$XDG_CONFIG_HOME/dev-environment/code-folder`, not in `projects.json`. That file is plain text, so a shell can read it without parsing JSON. dev-environment's `~/.bashrc` exports it as `$CODE_FOLDER` for every shell, including the ones an `ssh host cmd` starts. Its scripts that work out the code folder read the file first. Saving also sets the tmux server's global `CODE_FOLDER`, so new panes use the new folder without a reload.
 - **Saving:** when steward saves, keys it doesn't know are kept.
 - **Per machine:** each machine reads its own file. A linked machine's folders in `prefix,/`, and `prefix,N` to a host with dev-environment, come from that machine's file.
 
@@ -41,9 +40,12 @@ The screen:
 
 ```
 Project folders                                                 Reload
-Code folder  ~/code  read-only · 24 folders
-Saved in     ~/.config/dev-environment/projects.json
+Saved in     ~/.config/dev-environment/code-folder
+             ~/.config/dev-environment/projects.json
 ─────────────────────────── ◇ ───────────────────────────
+Code folder   where the projects are
+└─ /Git   24 folders
+
 Parent directories   their folders are listed
 ├─ clients   12 folders  ~/code/clients
 └─ ~/work   missing
@@ -52,10 +54,11 @@ Individual directories   listed themselves
 └─ ~/notes   new
 ```
 
-- **The header:** it is virtual text. The code folder shown there comes from `$CODE_FOLDER`. If that isn't set, the tmux server's `CODE_FOLDER` is used, then the first of `~/code`, `~/git` and `/Git`. You can't edit it here.
+- **The header:** it is virtual text, and you can't edit it.
+- **The code folder:** one folder that exists, written `~/…` or absolute. Until it has been saved, the screen shows the one in use, with a hint saying where it came from. That is `$CODE_FOLDER`, else the tmux server's `CODE_FOLDER`, else the first of `~/code`, `~/git` and `/Git`. Saving the screen then saves it. A `code_folder` set in `setup()` is shown instead, and saving leaves the file alone.
 - **Editing:** you add, change and remove folders by editing the text, one path a line, under its section title. As on workhorse.nvim's screens, the lines are indented one level (3 spaces) under their section, and the `├─` / `└─` guides are virtual text drawn over the indentation, so they are never yanked. The indentation is kept for you: a new line under a section (`o` even on its title) starts one level in, and a line typed at the start goes under its section when you leave insert mode. This holds on the themes screen too.
 - **Hints:** after each path. A parent shows how many folders it adds, and a relative path shows where it points. Other hints flag a path that is missing (allowed), not a folder, a duplicate, or new since the last load.
-- **Errors:** a file, a duplicate, the code folder as a parent, a missing section title, or an edited header line all block saving.
+- **Errors:** a file, a duplicate, the code folder as a parent, a missing section title, or an edited header line all block saving. So does a code folder that is missing, a file, relative, empty or written twice. Nothing is written then, neither file.
 
 | Key | |
 |---|---|

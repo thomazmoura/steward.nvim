@@ -14,6 +14,18 @@ T.test("code_folder takes the configured one first, a function too", function()
   end), T.dir .. "/other")
 end)
 
+T.test("code_folder takes the projects screen's code-folder file before $CODE_FOLDER", function()
+  T.mkdirs("code", "saved")
+  T.write(T.dir .. "/config/dev-environment/code-folder", T.dir .. "/saved\n")
+  T.eq(paths.code_folder(), T.dir .. "/saved")
+  -- The configured one still comes first
+  T.mkdirs("other")
+  T.eq(paths.code_folder(T.dir .. "/other"), T.dir .. "/other")
+  -- An empty file is no setting
+  T.write(T.dir .. "/config/dev-environment/code-folder", "\n")
+  T.eq(paths.code_folder(), T.dir .. "/code")
+end)
+
 T.test("resolve: relative to the code folder, ~ and absolute", function()
   local root = "/srv/code"
   T.eq(paths.resolve("clients", root), "/srv/code/clients")
